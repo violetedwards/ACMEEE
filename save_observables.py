@@ -5,19 +5,29 @@ import pickle
 
 #save observable numbers & graphs
 
+def density(s,states,excitation):
+    spin_densities = np.zeros(shape=(s.x.shape[0], 2))
+    for i in range(s.x.shape[0]):
+        for k in range(2):
+            spin_densities[i, k] = np.sum(abs(states.fulls[:,:,:,:,excitation][i, k, ...]) ** 2) * s.dx ** (s.count - 1) * s.count
+    up_n = spin_densities[:, 0]
+    down_n = spin_densities[:, 1]
+    n = up_n + down_n
+    return n
+
 def save_observables(state,system,excitation,newdistance,olddistance,outputpath,stateid,innerprodgrid):
 
     #Save all states
     #statetemp = state
-    #statetemp.full = statetemp.allfull[...,excitation]
-    #statetemp.allfull = 0
+    #statetemp.full = statetemp.fulls[...,excitation]
+    #statetemp.fulls = 0
     idea.state.save_many_body_state(state,f"{outputpath}/states/ID{str(stateid).zfill(4)}.state")
 
     #make wavefunction plot
     if system.electrons=="uu" or system.electrons=="dd":
-    	plt.imshow(state.allfull[...,excitation][:,0,:,0], cmap="seismic", vmax=0.75, vmin=-0.75, extent=[-20, 20, 20, -20], aspect=1)
+    	plt.imshow(state.fulls[:,:,:,:,excitation][:,0,:,0], cmap="seismic", vmax=0.75, vmin=-0.75, extent=[-20, 20, 20, -20], aspect=1)
     elif system.electrons=="ud" or system.electrons=="du":
-        plt.imshow(state.allfull[...,excitation][:,1,:,0], cmap="seismic", vmax=0.75, vmin=-0.75, extent=[-20, 20, 20, -20], aspect=1)
+        plt.imshow(state.fulls[:,:,:,:,excitation][:,1,:,0], cmap="seismic", vmax=0.75, vmin=-0.75, extent=[-20, 20, 20, -20], aspect=1)
     plt.xlabel("x, position of electron 1 (Bohrs)")
     plt.ylabel("x', poisition of electron 2 (Bohrs)")
     plt.title(f"Distance from origin = {newdistance}, excitation {excitation}")
@@ -28,8 +38,7 @@ def save_observables(state,system,excitation,newdistance,olddistance,outputpath,
     plt.close()
 
     #make density plot
-    state.full = state.allfull[...,excitation]
-    plt.plot(system.x, idea.observables.density(system, state=state), "m-", label="Charge Density")
+    plt.plot(system.x, density(system, state, excitation), "m-", label="Charge Density")
     plt.plot(system.x, system.v_ext, "g--", label="Potential")
     plt.xlabel("x (Bohrs)")
     plt.ylabel("v_ext / charge density")
@@ -53,7 +62,7 @@ def save_observables(state,system,excitation,newdistance,olddistance,outputpath,
     
     #save energy
     with open(f"{outputpath}/energies.txt","a") as file:
-        file.write(f"{str(stateid).zfill(4)},{str(newdistance)},{str(excitation)},{str(state.allenergy[excitation])}\n")
+        file.write(f"{str(stateid).zfill(4)},{str(newdistance)},{str(excitation)},{str(state.energies[excitation])}\n")
 
 
 

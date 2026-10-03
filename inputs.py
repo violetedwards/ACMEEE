@@ -20,7 +20,7 @@ potential_name = "symgaussian"
 debugging = True 
 
 #the initial excitation of the system, set to -1 if you want InDEX to identify the lowest energy double excitation
-doubleexcitation = 5
+doubleexcitation = 1
 
 #if finding double excitation, only excitations above this value will be searched. If double excitation is known, set to 0.
 find_startpoint = 0 
@@ -35,7 +35,7 @@ sensitivity = 5
 limit = 50
 
 #number of excitation above the target excitation that will be generated during the adiabatic movement. e.g. if state 7 is to be tracked, and abovedouble=5, the algorithm will generate states 0-12.
-abovedouble = 5
+abovedouble = 2
 
 #Inner product tolerance used for accepting states in the adiabatic movement. e.g. tol=0.1 will accept states that has an inner product >0.9
 innerprod_tolerence = 0.5
@@ -47,10 +47,10 @@ distance_step = 0.25
 maxdivisions = 30
 
 #spin configuration of the electrons
-electronconfig = "ud"
+electronconfig = "uu"
 
 #The path for the outputs
-outputpath = "../symgaussian-ud-e5"
+outputpath = "../symgaussian-uu-e5"
 
 #Select the job. plotpoential only outputs the potential plot. find only runs the double excitation finder. assemble runs the whole program, executing the adiabatic movement method.
 job = "assemble" #"assemble" #"find" #"plotpotential"
