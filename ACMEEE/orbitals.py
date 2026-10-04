@@ -27,13 +27,13 @@ def calculate_basis(state,single_states_a,single_states_b,electron_config,system
     elif electron_config == "ud":
         for i in range(0,len(single_states_a)):
             for j in range(0,len(single_states_b)):
-                basis_set[i][j] = (1/np.sqrt(2))*(np.outer(single_states_a[i],single_states_b[j]) + np.outer(single_states_b[j],single_states_a[i]))
+                basis_set[i][j] = np.sqrt(2)*np.outer(single_states_a[i],single_states_b[j])
                 coefficients[i][j] = acme.innerprod.innerproduct(state.full[:,0,:,1],basis_set[i][j],system,system)
                 completeness = completeness + (coefficients[i][j])**2
     elif electron_config == "du":
         for i in range(0,len(single_states_a)):
             for j in range(0,len(single_states_b)):
-                basis_set[i][j] = np.outer(single_states_a[i],single_states_b[j])
+                basis_set[i][j] = np.sqrt(2)*np.outer(single_states_a[i],single_states_b[j])
                 coefficients[i][j] = acme.innerprod.innerproduct(state.full[:,1,:,0],basis_set[i][j],system,system)
                 completeness = completeness + (coefficients[i][j])**2
 
@@ -47,18 +47,11 @@ def orbitals(state,system,stateid,distance,electron_config,orbital_max_excitatio
     
 
     #create single particle orbitals for a hartree-fock system
-    max_excitation = 10
-
-    #xgrid = np.linspace(-20,20,300)
-    v_int = idea.interactions.softened_interaction(xgrid)
-    v_ext_what = acme.potential.potential(xgrid,distance,potential_name)
-    v_ext = (-4*np.exp(-((xgrid-distance)**2)/10) - 4.005*np.exp(-((xgrid+distance)**2)/10)) #gaussian1
-    #print(np.sum(v_ext-v_ext_what))
-
-    #this bodge works
-    testsystem = idea.system.System(xgrid,v_ext,v_int,electrons=electron_config)
-    with acme.utilities.HiddenPrints():
-        teststate = idea.methods.hartree_fock.solve(testsystem,k=0,restricted=True,tol=1e-2)
+    #with acme.utilities.HiddenPrints():
+    if electron_config == "ud" or "du":
+        teststate = idea.methods.hartree_fock.solve(system,k=1,restricted=True,tol=1e-2)
+    elif electron_config == "uu" or "dd":
+        teststate = idea.methods.hartree_fock.solve(system,k=0,restricted=False,tol=1e-2)
 
     #doesnt????
     #testsystem = idea.system.System(xgrid,v_ext_what,v_int,electrons=electron_config)
@@ -66,9 +59,9 @@ def orbitals(state,system,stateid,distance,electron_config,orbital_max_excitatio
 
     #what the actual fuck im so confused
 
-    single_states_a = np.zeros((max_excitation+1,301),dtype=np.float32)
-    single_states_b = np.zeros((max_excitation+1,301),dtype=np.float32)
-    for i in range(0,max_excitation+1):
+    single_states_a = np.zeros((orbital_max_excitation+1,301),dtype=np.float32)
+    single_states_b = np.zeros((orbital_max_excitation+1,301),dtype=np.float32)
+    for i in range(0,orbital_max_excitation+1):
         if electron_config[0] == "u":
             single_states_a[i] = teststate.up.orbitals[:,i]
         if electron_config[0] == "d":
