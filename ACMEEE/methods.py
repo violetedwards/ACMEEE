@@ -4,6 +4,7 @@ import gc
 import datetime
 import sys
 import os
+import matplotlib.pyplot as plt
 
 import ACMEEE as acme
 
@@ -173,4 +174,14 @@ def assemble(
     acme.save_outputs.energy_graph(outputpath)
 
     return trackedstate, num_accepted, num_rejected, num_total
+
+
+def plotstate(xgrid, potential, distance, electron_config, trackedstate):
+    v_int = idea.interactions.softened_interaction(xgrid)
+    v_ext = acme.potential.potential(xgrid,distance,potential)
+    system = idea.system.System(xgrid,v_ext,v_int,electrons=electron_config)
+    state = idea.methods.interacting.solve(system,k=trackedstate)
+    plt.plot(system.x, idea.observables.density(system,state))
+    plt.plot(system.x,v_ext)
+    plt.show()
     
