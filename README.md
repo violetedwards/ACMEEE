@@ -1,6 +1,10 @@
-# Idea (Indigo's double excitation assembler)
-# If you are uncool its InDEX (Indigo's Double Electron eXciter)
-![alt text](https://indigoedwards.org/otherimages/idealogo.png)
+# ACMEEE
+# Avoided Crossings in the Movement of Exact Electronic Excitation
+Previously InDEX previously Idea
+
+A LOT OF THIS README IS OUTDATED SINCE THE CODE WAS REWRITTEN INTO A PACKAGE
+ACMEEE NO LONGER NEEDS THE CUSTOM VERSION OF iDEA
+
 ----------------------------
 A python program for all your one dimentional double excitation needs :D
 
