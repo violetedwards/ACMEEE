@@ -1,6 +1,6 @@
 # ACMEEE
 
-ACMEEE (Avoided Crossings in the Movement of Exact Electronic Excitation)
+ACMEEE (Avoided Crossings in the Movement of Exact Electronic Excitations)
 
 Python package for tracking electronic excitations as one-dimensional potential wells move.
 
