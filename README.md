@@ -20,7 +20,7 @@ To install the current GitHub version instead:
 python -m pip install git+https://github.com/violetedwards/acmeee.git
 ```
 
-## Quick start
+## Usage
 
 See testing.py for an example
 
