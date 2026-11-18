@@ -23,7 +23,9 @@ def assemble(
         abovetracked: int = 5,
         innerprod_tolerence: float = 0.1,
         maxdivisions: int = 30,
-        orbital_max_excitation: int = 20) -> tuple[int,int,int,int]:
+        orbital_max_excitation: int = 20,
+        save_states: bool = False,
+        save_hf_orbitals: bool = False) -> tuple[int,int,int,int]:
     """
     Performs the adiabatic movement
 
@@ -43,6 +45,8 @@ def assemble(
     innerprod_tolerence: float, inner product tolerance used for accepting states in the adiabatic movement. e.g. tol=0.1 will accept states that has an inner product >0.9
     maxdivisions: int, maximum number of step divisions before program gives up
     orbital_max_excitations: highest orbital excitation used in the CI expansions
+    save_states: bool, save the full states at every accepted distance and the final tracked state
+    save_hf_orbitals: bool, save Hartree-Fock orbital analysis at every accepted distance
 
     Returns:
     trackedstate: int, excitation number of the tracked state at end of movemement
@@ -51,7 +55,7 @@ def assemble(
     num_total: int, total number of steps during the movement
     """
 
-    outputpath = acme.utilities.clearoutputs(outputpath)
+    outputpath = acme.utilities.clearoutputs(outputpath, save_hf_orbitals)
 
     #initialise outputs
     num_total = 1
@@ -76,13 +80,18 @@ def assemble(
     system_old = idea.system.System(xgrid,acme.potential.potential(xgrid,distance_old,potential_name),v_int,electrons=electronconfig)
     with acme.utilities.HiddenPrints():
         state_old = idea.methods.interacting.solve(system_old, k=-1, level=idea.methods.interacting._estimate_level(system_old,maxexcitation_gen))
+    available_states = min(maxexcitation_gen + 1, len(state_old.energies))
+    tracked_pair = [trackedstate]
+    if available_states > 1:
+        partner_candidates = [i for i in range(available_states) if i != trackedstate]
+        partner = min(partner_candidates, key=lambda i: abs(state_old.energies[i] - state_old.energies[trackedstate]))
+        tracked_pair.append(partner)
     state_id = 1
-    acme.save_outputs.save_observables(state_old,system_old,trackedstate,distance_old,distance_old,outputpath,state_id,0)
-    state_temp = state_old
-    state_temp.full = state_temp.fulls[:,:,:,:,trackedstate]
-    hf = acme.orbitals.orbitals(state_temp,system_old,state_id,distance_old,electronconfig,orbital_max_excitation,outputpath,potential_name,xgrid)
-    print(f"     Hartree-Fock completeness: {hf*100}%")
-    sys.stdout.flush()    
+    acme.save_outputs.save_observables(state_old,system_old,trackedstate,distance_old,distance_old,outputpath,state_id,0,tracked_pair,save_state=save_states)
+    if save_hf_orbitals:
+        state_old.full = state_old.fulls[:,:,:,:,trackedstate]
+        hf = acme.orbitals.orbitals(state_old,system_old,state_id,distance_old,electronconfig,orbital_max_excitation,outputpath,potential_name,xgrid,save_orbital_info=save_hf_orbitals)
+        print(f"     Hartree-Fock completeness: {hf*100}%")
 
 
     n = 1
@@ -96,7 +105,7 @@ def assemble(
         num_total = num_total + 1
         print(f"{datetime.datetime.now()}: Generating states at distance {distance_new}",flush=True)
         sys.stdout.flush()
-        maxexcitation_gen = trackedstate + abovetracked
+        maxexcitation_gen = max(tracked_pair) + abovetracked
         with acme.utilities.HiddenPrints():
             system_new = idea.system.System(xgrid,acme.potential.potential(xgrid,distance_new,potential_name),v_int,electrons=electronconfig)
         state_new = idea.methods.interacting.solve(system_new, k=-1, level=idea.methods.interacting._estimate_level(system_old,maxexcitation_gen))
@@ -106,12 +115,23 @@ def assemble(
         if debugging == True:
             acme.save_outputs.save_innerprodgrid(innergrid_old_new,distance_old,distance_new,outputpath)
 
-        #get value and index of highest inner product for old state double excitation
-        de_innerprod_value = np.max(innergrid_old_new[trackedstate])
-        de_innerprod_index = np.argmax(innergrid_old_new[trackedstate])
+#match candidate states to the tracked pair using the full overlap matrix
+        pair_overlap = innergrid_old_new[tracked_pair, :maxexcitation_gen + 1]
+        candidate_scores = np.sum(pair_overlap ** 2, axis=0)
+        candidate_pair = np.argsort(candidate_scores)[-len(tracked_pair):]
+        de_subspace_overlap = np.sqrt(np.sum(candidate_scores[candidate_pair]) / len(tracked_pair))
+        candidate_assignments = [candidate_pair]
+        if len(tracked_pair) == 2:
+            candidate_assignments.append(candidate_pair[::-1])
+        candidate_pair = max(candidate_assignments, key=lambda assignment: sum(pair_overlap[row, assignment[row]] for row in range(len(tracked_pair))))
+        de_innerprod_index = candidate_pair[0]
+        de_innerprod_value = pair_overlap[0, de_innerprod_index]
 
-        #check if there is an inner product above 1-tolerance
-        if (de_innerprod_value > (1-innerprod_tolerence)):
+#accept a step if the tracked state or its paired subspace remains continuous
+        if de_innerprod_value <= (1-innerprod_tolerence) and de_subspace_overlap > (1-innerprod_tolerence):
+            print(f"{datetime.datetime.now()}: Tracked state subspace at distance {distance_new}, pair={candidate_pair.tolist()}, overlap={de_subspace_overlap}, selecting excitation={de_innerprod_index}",flush=True)
+
+        if de_innerprod_value > (1-innerprod_tolerence) or de_subspace_overlap > (1-innerprod_tolerence):
             #state found
             num_accepted = num_accepted + 1
             #is the current distance a multiple of the step distance?
@@ -119,13 +139,13 @@ def assemble(
                 print(f"{datetime.datetime.now()}: Tracked state found at distance {distance_new}, Innerproduct {de_innerprod_value}, excitation={de_innerprod_index}",flush=True)
                 sys.stdout.flush()
                 state_id = state_id + 1
-                trackedstate = de_innerprod_index
-                acme.save_outputs.save_observables(state_new,system_new,trackedstate,distance_new,distance_old,outputpath,state_id,innergrid_old_new)
-                state_temp = state_new
-                state_temp.full = state_temp.fulls[:,:,:,:,trackedstate]
-                hf = acme.orbitals.orbitals(state_temp,system_new,state_id,distance_new,electronconfig,orbital_max_excitation,outputpath,potential_name,xgrid)
-                print(f"     Hartree-Fock completeness: {hf*100}%")
-                sys.stdout.flush()
+                trackedstate = int(de_innerprod_index)
+                tracked_pair = candidate_pair.tolist()
+                acme.save_outputs.save_observables(state_new,system_new,trackedstate,distance_new,distance_old,outputpath,state_id,innergrid_old_new,tracked_pair,save_state=save_states)
+                if save_hf_orbitals:
+                    state_new.full = state_new.fulls[:,:,:,:,trackedstate]
+                    hf = acme.orbitals.orbitals(state_new,system_new,state_id,distance_new,electronconfig,orbital_max_excitation,outputpath,potential_name,xgrid,save_orbital_info=save_hf_orbitals)
+                    print(f"     Hartree-Fock completeness: {hf*100}%")
                 system_old = system_new
                 state_old = state_new
                 del state_new
@@ -138,13 +158,13 @@ def assemble(
                 print(f"{datetime.datetime.now()}: Tracked excitation state found at distance {distance_new}, Innerproduct {de_innerprod_value}, excitation={de_innerprod_index}",flush=True)
                 sys.stdout.flush()
                 state_id = state_id + 1
-                trackedstate = de_innerprod_index
-                acme.save_outputs.save_observables(state_new,system_new,trackedstate,distance_new,distance_old,outputpath,state_id,innergrid_old_new)
-                state_temp = state_new
-                state_temp.full = state_temp.fulls[:,:,:,:,trackedstate]
-                hf = acme.orbitals.orbitals(state_temp,system_new,state_id,distance_new,electronconfig,orbital_max_excitation,outputpath,potential_name,xgrid)
-                print(f"     Hartree-Fock completeness: {hf*100}%")
-                sys.stdout.flush()
+                trackedstate = int(de_innerprod_index)
+                tracked_pair = candidate_pair.tolist()
+                acme.save_outputs.save_observables(state_new,system_new,trackedstate,distance_new,distance_old,outputpath,state_id,innergrid_old_new,tracked_pair,save_state=save_states)
+                if save_hf_orbitals:
+                    state_new.full = state_new.fulls[:,:,:,:,trackedstate]
+                    hf = acme.orbitals.orbitals(state_new,system_new,state_id,distance_new,electronconfig,orbital_max_excitation,outputpath,potential_name,xgrid,save_orbital_info=save_hf_orbitals)
+                    print(f"     Hartree-Fock completeness: {hf*100}%")
                 system_old = system_new
                 state_old = state_new
                 del state_new
@@ -165,7 +185,8 @@ def assemble(
                 raise Exception("Max number of deivisons reached. Stopping")
             n = n + 1
 
-    idea.state.save_many_body_state(state_old.fulls[:,:,:,:,trackedstate],f"{outputpath}/doublestate.state")
+    if save_states:
+        idea.state.save_many_body_state(state_old.fulls[:,:,:,:,trackedstate],f"{outputpath}/doublestate.state")
     idea.system.save_system(system_old,f"{outputpath}/doublestate.system")
 
     acme.save_outputs.gif_wavefunctions(outputpath)

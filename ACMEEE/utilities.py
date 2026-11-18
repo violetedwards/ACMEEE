@@ -9,7 +9,7 @@ class HiddenPrints:
         sys.stdout.close()
         sys.stdout = self._original_stdout
 
-def clearoutputs(output_filepath):
+def clearoutputs(output_filepath, save_hf_orbitals=False):
     is_file_path = os.path.isdir(output_filepath)
     if is_file_path:
         print("file path already exists - generating new path")
@@ -22,15 +22,14 @@ def clearoutputs(output_filepath):
     #shutil.rmtree(f"{output_filepath}/")
     
     os.makedirs(f"{output_filepath}/wavefunctions")
+    os.makedirs(f"{output_filepath}/states")
     os.makedirs(f"{output_filepath}/innerprods")
     os.makedirs(f"{output_filepath}/densities")
     os.makedirs(f"{output_filepath}/debugging")
-    os.makedirs(f"{output_filepath}/orbitals")
-    os.makedirs(f"{output_filepath}/orbitals/hartree-fock")
-    os.makedirs(f"{output_filepath}/states")
+    if save_hf_orbitals:
+        os.makedirs(f"{output_filepath}/orbitals/hartree-fock")
     f = open(f"{output_filepath}/energies.txt", "x")
 
     
     print(f"working directory is now {output_filepath}")
     return output_filepath
-

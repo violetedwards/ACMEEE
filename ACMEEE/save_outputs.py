@@ -3,6 +3,7 @@ import ACMEEE as acme
 import numpy as np
 import matplotlib.pyplot as plt
 import iDEA as idea
+import os
 import pickle
 import glob
 import contextlib
@@ -21,17 +22,17 @@ def density(s,states,excitation):
     n = up_n + down_n
     return n
 
-def save_observables(state,system,excitation,newdistance,olddistance,outputpath,stateid,innerprodgrid):
+def save_observables(
+        state,system,excitation,newdistance,olddistance,outputpath,stateid,
+        innerprodgrid,tracked_pair=None,save_state=False):
 
     #Save all states
-    #statetemp = state
-    #statetemp.full = statetemp.fulls[...,excitation]
-    #statetemp.fulls = 0
-    idea.state.save_many_body_state(state,f"{outputpath}/states/ID{str(stateid).zfill(4)}.state")
+    if save_state:
+        idea.state.save_many_body_state(state,f"{outputpath}/states/ID{str(stateid).zfill(4)}.state")
 
     #make wavefunction plot
     if system.electrons=="uu" or system.electrons=="dd":
-    	plt.imshow(state.fulls[:,:,:,:,excitation][:,0,:,0], cmap="seismic", vmax=0.75, vmin=-0.75, extent=[-20, 20, 20, -20], aspect=1)
+        plt.imshow(state.fulls[:,:,:,:,excitation][:,0,:,0], cmap="seismic", vmax=0.75, vmin=-0.75, extent=[-20, 20, 20, -20], aspect=1)
     elif system.electrons=="ud" or system.electrons=="du":
         plt.imshow(state.fulls[:,:,:,:,excitation][:,1,:,0], cmap="seismic", vmax=0.75, vmin=-0.75, extent=[-20, 20, 20, -20], aspect=1)
     plt.xlabel("x, position of electron 1 (Bohrs)")
@@ -70,6 +71,11 @@ def save_observables(state,system,excitation,newdistance,olddistance,outputpath,
     with open(f"{outputpath}/energies.txt","a") as file:
         file.write(f"{str(stateid).zfill(4)},{str(newdistance)},{str(excitation)},{str(state.energies[excitation])}\n")
 
+    if tracked_pair is not None:
+        partner = tracked_pair[1] if len(tracked_pair) > 1 else -1
+        partner_energy = state.energies[partner] if partner >= 0 else np.nan
+        with open(f"{outputpath}/tracked_pair_energies.txt","a") as file:
+            file.write(f"{str(stateid).zfill(4)},{str(newdistance)},{excitation},{state.energies[excitation]},{partner},{partner_energy}\n")
 
 
     return
